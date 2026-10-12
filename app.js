@@ -129,11 +129,11 @@ function createMotionEffects() {
   const seen = new WeakSet();
   const observer = typeof window.IntersectionObserver === 'function' ? new IntersectionObserver(entries => {
     entries.forEach(entry => {
-      if (!entry.isIntersecting) return;
+      if (!entry.isIntersecting || entry.intersectionRatio < 0.08) return;
       observer.unobserve(entry.target);
       reveal(entry.target, delays.get(entry.target) || 0);
     });
-  }, { threshold: 0, rootMargin: '0px 0px 72px 0px' }) : null;
+  }, { threshold: 0.08, rootMargin: '0px 0px -24px 0px' }) : null;
 
   function reveal(element, delay = 0, offset = 10, fade = false) {
     if (preference.matches || typeof element.animate !== 'function') return;
