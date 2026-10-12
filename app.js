@@ -133,15 +133,16 @@ function createMotionEffects() {
       observer.unobserve(entry.target);
       reveal(entry.target, delays.get(entry.target) || 0);
     });
-  }, { threshold: 0.08, rootMargin: '0px 0px -24px 0px' }) : null;
+  }, { threshold: 0, rootMargin: '0px 0px 72px 0px' }) : null;
 
-  function reveal(element, delay = 0, offset = 22) {
+  function reveal(element, delay = 0, offset = 10, fade = false) {
     if (preference.matches || typeof element.animate !== 'function') return;
     const animation = element.animate([
-      { opacity: 0, transform: `translateY(${offset}px)` },
+      // Scroll reveals keep full opacity so visible content never flashes away.
+      { opacity: fade ? 0 : 1, transform: `translateY(${offset}px)` },
       { opacity: 1, transform: 'translateY(0)' },
     ], {
-      duration: 650,
+      duration: 580,
       delay,
       easing: 'cubic-bezier(0.22, 1, 0.36, 1)',
       fill: 'backwards',
@@ -155,7 +156,7 @@ function createMotionEffects() {
     Array.from(elements).forEach((element, index) => {
       if (seen.has(element)) return;
       seen.add(element);
-      delays.set(element, Math.min(index * stagger, 180));
+      delays.set(element, Math.min(index * stagger, 90));
       observer.observe(element);
     });
   }
@@ -169,9 +170,9 @@ function createMotionEffects() {
   }
 
   function start() {
-    reveal(document.querySelector('.header'), 0, -10);
+    reveal(document.querySelector('.header'), 0, -6, true);
     document.querySelectorAll('.hero-copy > *').forEach((element, index) => {
-      reveal(element, 60 + index * 75);
+      reveal(element, 40 + index * 50, 12, true);
     });
     observe(document.querySelectorAll('.hero-visual'));
     observe(document.querySelectorAll('.values-strip'));
