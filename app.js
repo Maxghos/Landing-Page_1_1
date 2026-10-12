@@ -15,8 +15,10 @@ const models = [
   { id: 'bianco', title: 'Modelo Bianco', detail: 'Un diseño en tonos claros. Explora sus detalles desde diferentes perspectivas.', images: ['SillonBianco_2.png', 'SillonBianco_1.png', 'SillonBianco_3.png', 'SillonBianco.png'] },
   { id: 'fullham', title: 'Modelo Fullham', detail: 'Medidas del modelo mostrado: 200 cm de ancho × 80 cm de profundidad × 82 cm de alto. Consulta opciones a medida.', images: ['SillonFullham_3.png', 'SillonFullham_1.png', 'SillonFullham_2.png', 'SillonFullhamMedidas.png', 'SillonFullham.png'] },
 ];
+const motion = createMotionEffects();
 const grid = document.querySelector('#work-grid');
 function renderProjects(filter = 'all') {
+  motion.forget(grid.querySelectorAll('.work-card'));
   const visible = projects.filter(project => filter === 'all' || project.category === filter);
   grid.replaceChildren(...visible.map((project) => {
     const card = document.createElement('article');
@@ -24,6 +26,7 @@ function renderProjects(filter = 'all') {
     card.innerHTML = `<button class="photo-button" data-project="${project.id}" aria-label="Ampliar ${project.title}"><img src="assets/${project.images[0]}" alt="${project.title}: ${project.detail}, fotografiado en el taller" loading="lazy" width="1280" height="960"><span class="photo-action" aria-hidden="true">${arrowIcon}</span></button><div class="work-card-info"><div><h3>${project.title}</h3><p>${project.detail}</p></div><span>${arrowIcon}</span></div>`;
     return card;
   }));
+  motion.observe(grid.querySelectorAll('.work-card'), 70);
   document.querySelector('#gallery-count').textContent = `${visible.length} ${visible.length === 1 ? 'trabajo' : 'trabajos'} · Hechos en nuestro taller`;
 }
 renderProjects();
@@ -116,3 +119,85 @@ document.querySelector('#copy-consultation').addEventListener('click', async () 
   }
 });
 document.querySelector('#year').textContent = new Date().getFullYear();
+
+
+// Progressive enhancement: content stays visible when animations are unavailable.
+function createMotionEffects() {
+  const preference = window.matchMedia('(prefers-reduced-motion: reduce)');
+  const active = new Set();
+  const delays = new WeakMap();
+  const seen = new WeakSet();
+  const observer = typeof window.IntersectionObserver === 'function' ? new IntersectionObserver(entries => {
+    entries.forEach(entry => {
+      if (!entry.isIntersecting) return;
+      observer.unobserve(entry.target);
+      reveal(entry.target, delays.get(entry.target) || 0);
+    });
+  }, { threshold: 0.08, rootMargin: '0px 0px -24px 0px' }) : null;
+
+  function reveal(element, delay = 0, offset = 22) {
+    if (preference.matches || typeof element.animate !== 'function') return;
+    const animation = element.animate([
+      { opacity: 0, transform: `translateY(${offset}px)` },
+      { opacity: 1, transform: 'translateY(0)' },
+    ], {
+      duration: 650,
+      delay,
+      easing: 'cubic-bezier(0.22, 1, 0.36, 1)',
+      fill: 'backwards',
+    });
+    active.add(animation);
+    animation.onfinish = animation.oncancel = () => active.delete(animation);
+  }
+
+  function observe(elements, stagger = 0) {
+    if (preference.matches || !observer) return;
+    Array.from(elements).forEach((element, index) => {
+      if (seen.has(element)) return;
+      seen.add(element);
+      delays.set(element, Math.min(index * stagger, 180));
+      observer.observe(element);
+    });
+  }
+
+  function forget(elements) {
+    const removed = new Set(elements);
+    removed.forEach(element => observer?.unobserve(element));
+    active.forEach(animation => {
+      if (removed.has(animation.effect.target)) animation.cancel();
+    });
+  }
+
+  function start() {
+    reveal(document.querySelector('.header'), 0, -10);
+    document.querySelectorAll('.hero-copy > *').forEach((element, index) => {
+      reveal(element, 60 + index * 75);
+    });
+    observe(document.querySelectorAll('.hero-visual'));
+    observe(document.querySelectorAll('.values-strip'));
+    observe(document.querySelectorAll('.section-heading > *'), 70);
+    observe(document.querySelectorAll('.model-card'), 90);
+    observe(document.querySelectorAll('.work-toolbar'));
+    observe(document.querySelectorAll('.process-intro'));
+    observe(document.querySelectorAll('.steps article'), 70);
+    observe(document.querySelectorAll('.contact-layout > *'), 90);
+    observe(document.querySelectorAll('.footer > *'), 50);
+  }
+
+  // Changing the device preference also stops animations already in progress.
+  preference.addEventListener('change', event => {
+    if (!event.matches) return;
+    observer?.disconnect();
+    active.forEach(animation => animation.cancel());
+    active.clear();
+  });
+  // Never leave a focused link or form field inside a delayed fade.
+  document.addEventListener('focusin', event => {
+    active.forEach(animation => {
+      if (animation.effect.target.contains(event.target)) animation.finish();
+    });
+  });
+  return { observe, forget, start };
+}
+
+motion.start();
